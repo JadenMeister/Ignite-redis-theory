@@ -188,6 +188,7 @@ graph TD
     style B2 fill:#808080
     style B3 fill:#808080
 ```
+
 > **💡 팁: 고가용성(High Availability)**
 > <div style="background-color: #daa520; padding: 10px; border-radius: 5px;">
 > 이처럼 파티셔닝과 복제 기능을 통해 Ignite는 일부 노드에 장애가 발생하더라도 전체 시스템은 중단 없이 동작하는 **고가용성**을 제공합니다. 이는 24시간 365일 안정적인 서비스가 필수적인 시스템에서 매우 중요한 특징입니다.
@@ -236,6 +237,74 @@ Ignite의 메모리 아키텍처에서 GC(Garbage Collection)의 영향을 최�
 
 ---
 
-## 🔗 참고 자료
-- [Apache Ignite Docs: Data Grid](https://ignite.apache.org/docs/latest/data-grid/data-grid)
-- [Apache Ignite Docs: Ignite Persistence](https://ignite.apache.org/docs/latest/data-grid/ignite-persistence)
+## 🔧 실습 예제: Ignite 메모리 아키텍처 설정 (Java/Spring, Kotlin/Spring)
+
+### Java(Spring) 예제
+```java
+// 파일 경로: src/main/java/com/example/ignite/MemoryConfig.java
+package com.example.ignite;
+
+import org.apache.ignite.Ignite;
+import org.apache.ignite.Ignition;
+import org.apache.ignite.configuration.DataRegionConfiguration;
+import org.apache.ignite.configuration.IgniteConfiguration;
+
+public class MemoryConfig {
+    public static void main(String[] args) {
+        // IgniteConfiguration 객체 생성
+        IgniteConfiguration cfg = new IgniteConfiguration();
+
+        // DataRegionConfiguration: Off-Heap 메모리 영역 설정
+        DataRegionConfiguration regionCfg = new DataRegionConfiguration();
+        regionCfg.setName("offheap-region"); // 데이터 영역 이름 지정
+        regionCfg.setInitialSize(256 * 1024 * 1024); // 초기 크기: 256MB
+        regionCfg.setMaxSize(1024 * 1024 * 1024); // 최대 크기: 1GB
+        regionCfg.setPersistenceEnabled(true); // 디스크 영속성 활성화
+
+        // Ignite에 데이터 영역 추가
+        cfg.setDataRegionConfigurations(regionCfg);
+
+        // Ignite 노드 시작
+        try (Ignite ignite = Ignition.start(cfg)) {
+            System.out.println("Ignite started with custom memory configuration.");
+            // ...여기에 캐시 생성 및 데이터 저장 코드 추가 가능...
+        }
+    }
+}
+```
+
+### Kotlin(Spring) 예제
+```kotlin
+// 파일 경로: src/main/kotlin/com/example/ignite/MemoryConfig.kt
+package com.example.ignite
+
+import org.apache.ignite.Ignition
+import org.apache.ignite.configuration.DataRegionConfiguration
+import org.apache.ignite.configuration.IgniteConfiguration
+
+fun main() {
+    // IgniteConfiguration 객체 생성
+    val cfg = IgniteConfiguration()
+
+    // DataRegionConfiguration: Off-Heap 메모리 영역 설정
+    val regionCfg = DataRegionConfiguration().apply {
+        name = "offheap-region" // 데이터 영역 이름 지정
+        initialSize = 256 * 1024 * 1024 // 초기 크기: 256MB
+        maxSize = 1024 * 1024 * 1024 // 최대 크기: 1GB
+        isPersistenceEnabled = true // 디스크 영속성 활성화
+    }
+
+    // Ignite에 데이터 영역 추가
+    cfg.dataRegionConfigurations = arrayOf(regionCfg)
+
+    // Ignite 노드 시작
+    Ignition.start(cfg).use {
+        println("Ignite started with custom memory configuration.")
+        // ...여기에 캐시 생성 및 데이터 저장 코드 추가 가능...
+    }
+}
+```
+
+> **파일 위치 설명**: SpringBoot 프로젝트의 표준 구조에 따라, 설정 및 예제 코드는 src/main/java 또는 src/main/kotlin 하위에 위치합니다. 이는 패키지 관리와 빌드 자동화, 유지보수에 유리합니다.
+
+---

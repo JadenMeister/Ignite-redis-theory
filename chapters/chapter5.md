@@ -38,33 +38,37 @@ Ignite는 고성능을 목표로 설계되었지만, 애플리케이션의 특�
 ```mermaid
 graph TD
     subgraph "Without Affinity"
-        subgraph Node A
+        subgraph NodeA
             P1[Person: John<br>CityID: 1]
             C2[City: London<br>ID: 2]
         end
-        subgraph Node B
+        subgraph NodeB
             P2[Person: Mary<br>CityID: 2]
             C1[City: Paris<br>ID: 1]
         end
         P2 -- "Network Call for Join" --> C2
     end
 
-    subgraph "With Affinity (CityID)"
-        subgraph Node X
-            P1_A[Person: John<br>CityID: 1]
-            C1_A[City: Paris<br>ID: 1]
+    subgraph "With Affinity"
+        subgraph NodeA2
+            P1A[Person: John<br>CityID: 1]
+            C1A[City: Paris<br>ID: 1]
         end
-        subgraph Node Y
-            P2_A[Person: Mary<br>CityID: 2]
-            C2_A[City: London<br>ID: 2]
+        subgraph NodeB2
+            P2A[Person: Mary<br>CityID: 2]
+            C2A[City: London<br>ID: 2]
         end
-        P2_A -- "Local Join (No Network)" --> C2_A
+        P2A -. "Local Join" .-> C2A
     end
 
-    style P2 fill:#c35b5b
-    style C2 fill:#c35b5b
-    style P2_A fill:#3cb371
-    style C2_A fill:#3cb371
+    style P1 fill:#daa520
+    style P2 fill:#daa520
+    style P1A fill:#3cb371
+    style P2A fill:#3cb371
+    style C1 fill:#808080
+    style C2 fill:#808080
+    style C1A fill:#808080
+    style C2A fill:#808080
 ```
 
 > **💡 팁: 점진적인 최적화**
@@ -109,10 +113,16 @@ graph TD
     N1 -- "Metrics" --> JMX
     N1 -- "Metrics" --> CLI
     N1 -- "Metrics" --> P
-
     N2 -- "Metrics" --> JMX
     N2 -- "Metrics" --> CLI
     N2 -- "Metrics" --> P
+
+    style N1 fill:#3cb371
+    style N2 fill:#3cb371
+    style JMX fill:#daa520
+    style CLI fill:#daa520
+    style P fill:#808080
+    style G fill:#808080
 ```
 
 > **✅ 성공 포인트: 어떤 도구를 사용해야 할까?**
@@ -152,7 +162,96 @@ Ignite 클러스터는 기본적으로 비활성(inactive) 상태로 시작됩�
 
 ---
 
-## ✅ 확인 문제
+## 🔧 실습 예제: Ignite 성능 튜닝 및 모니터링 (Java/Spring, Kotlin/Spring)
+
+### Java(Spring) 예제
+```java
+// 파일 경로: src/main/java/com/example/ignite/PerformanceConfig.java
+package com.example.ignite;
+
+import org.apache.ignite.Ignite;
+import org.apache.ignite.Ignition;
+import org.apache.ignite.configuration.DataRegionConfiguration;
+import org.apache.ignite.configuration.IgniteConfiguration;
+import org.apache.ignite.cache.query.annotations.QuerySqlField;
+import org.apache.ignite.cache.affinity.AffinityKey;
+
+public class PerformanceConfig {
+    public static void main(String[] args) {
+        // Off-Heap 메모리 영역 설정
+        DataRegionConfiguration regionCfg = new DataRegionConfiguration();
+        regionCfg.setName("offheap-region");
+        regionCfg.setInitialSize(256 * 1024 * 1024); // 256MB
+        regionCfg.setMaxSize(1024 * 1024 * 1024); // 1GB
+        regionCfg.setPersistenceEnabled(true); // 디스크 영속성 활성화
+
+        // IgniteConfiguration에 데이터 영역 추가
+        IgniteConfiguration cfg = new IgniteConfiguration();
+        cfg.setDataRegionConfigurations(regionCfg);
+
+        // JMX 모니터링은 Ignite가 기본적으로 활성화 (JConsole/VisualVM에서 확인 가능)
+        try (Ignite ignite = Ignition.start(cfg)) {
+            System.out.println("Ignite started for performance tuning and monitoring.");
+        }
+    }
+
+    // 인덱스와 AffinityKey 예시
+    public static class Person {
+        @QuerySqlField(index = true) // 인덱스 생성
+        public int cityId;
+        @QuerySqlField
+        public String name;
+        // AffinityKey를 사용해 데이터 지역성 확보
+        public AffinityKey<Integer> affinityKey() {
+            return new AffinityKey<>(cityId);
+        }
+    }
+}
+```
+
+### Kotlin(Spring) 예제
+```kotlin
+// 파일 경로: src/main/kotlin/com/example/ignite/PerformanceConfig.kt
+package com.example.ignite
+
+import org.apache.ignite.Ignition
+import org.apache.ignite.configuration.DataRegionConfiguration
+import org.apache.ignite.configuration.IgniteConfiguration
+import org.apache.ignite.cache.query.annotations.QuerySqlField
+import org.apache.ignite.cache.affinity.AffinityKey
+
+fun main() {
+    // Off-Heap 메모리 영역 설정
+    val regionCfg = DataRegionConfiguration().apply {
+        name = "offheap-region"
+        initialSize = 256 * 1024 * 1024 // 256MB
+        maxSize = 1024 * 1024 * 1024 // 1GB
+        isPersistenceEnabled = true // 디스크 영속성 활성화
+    }
+    // IgniteConfiguration에 데이터 영역 추가
+    val cfg = IgniteConfiguration().apply {
+        dataRegionConfigurations = arrayOf(regionCfg)
+    }
+    // JMX 모니터링은 Ignite가 기본적으로 활성화 (JConsole/VisualVM에서 확인 가능)
+    Ignition.start(cfg).use {
+        println("Ignite started for performance tuning and monitoring.")
+    }
+}
+
+// 인덱스와 AffinityKey 예시
+data class Person(
+    @QuerySqlField(index = true) val cityId: Int, // 인덱스 생성
+    @QuerySqlField val name: String
+) {
+    fun affinityKey(): AffinityKey<Int> = AffinityKey(cityId) // 데이터 지역성 확보
+}
+```
+
+> **파일 위치 설명**: 성능 튜닝 및 모니터링 예제는 src/main/java 또는 src/main/kotlin 하위에 위치합니다. SpringBoot 프로젝트에서는 설정 및 모니터링 코드를 별도 클래스로 관리하는 것이 유지보수에 유리합니다.
+
+---
+
+## 4. 확인 문제
 
 ### 문제 1 (단일 선택)
 SQL 쿼리 성능을 높이기 위해 `WHERE` 절에 사용되는 필드에 반드시 설정해야 하는 것은 무엇입니까?
@@ -195,4 +294,3 @@ Ignite 클러스터의 상태를 모니터링하는 데 사용할 수 있는 도
 ## 🔗 참고 자료
 - [Apache Ignite Docs: Performance and Tuning](https://ignite.apache.org/docs/latest/performance/jvm-and-system-tuning)
 - [Apache Ignite Docs: Monitoring and Management](https://ignite.apache.org/docs/latest/tools/monitoring-management)
-

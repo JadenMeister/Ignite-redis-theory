@@ -48,17 +48,16 @@ graph TD
         B[Browser / React App]
         N[Node.js Server]
     end
-
-    subgraph "Ignite Cluster"
-        I[Ignite Node with REST]
+    subgraph "Ignite REST API"
+        I[Ignite Server]
     end
 
-    B -- "HTTP Request" --> I
-    N -- "HTTP Request" --> I
+    B -- "HTTP Request" --> N
+    N -- "REST API Call" --> I
 
-    style I fill:#3cb371
     style B fill:#daa520
-    style N fill:#daa520
+    style N fill:#3cb371
+    style I fill:#808080
 ```
 
 > **💡 팁: 보안 설정**
@@ -283,6 +282,57 @@ export default MemberList;
 
 ---
 
+## 🔧 실습 예제: Ignite REST API 연동 (Java/Spring, Kotlin/Spring)
+
+### Java(Spring) 예제
+```java
+// 파일 경로: src/main/java/com/example/ignite/RestApiExample.java
+package com.example.ignite;
+
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+
+public class RestApiExample {
+    public static void main(String[] args) {
+        // RestTemplate 객체 생성 (Spring에서 HTTP 요청을 쉽게 처리)
+        RestTemplate restTemplate = new RestTemplate();
+        // Ignite REST API 엔드포인트 URL
+        String url = "http://localhost:8080/ignite?cmd=get&cacheName=userCache&key=1";
+        // GET 요청으로 데이터 조회
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(new HttpHeaders()), String.class);
+        // 결과 출력
+        System.out.println("Ignite REST API Response: " + response.getBody());
+    }
+}
+```
+
+### Kotlin(Spring) 예제
+```kotlin
+// 파일 경로: src/main/kotlin/com/example/ignite/RestApiExample.kt
+package com.example.ignite
+
+import org.springframework.web.reactive.function.client.WebClient
+import reactor.core.publisher.Mono
+
+fun main() {
+    // WebClient 객체 생성 (Spring WebFlux 기반 비동기 HTTP 클라이언트)
+    val webClient = WebClient.create("http://localhost:8080")
+    // Ignite REST API 엔드포인트 URL
+    val uri = "/ignite?cmd=get&cacheName=userCache&key=1"
+    // GET 요청으로 데이터 조회
+    val response: Mono<String> = webClient.get().uri(uri).retrieve().bodyToMono(String::class.java)
+    // 결과 출력 (블로킹 방식)
+    println("Ignite REST API Response: ${response.block()}")
+}
+```
+
+> **파일 위치 설명**: REST API 연동 예제는 src/main/java 또는 src/main/kotlin 하위에 위치합니다. SpringBoot 프로젝트에서는 컨트롤러 또는 서비스 계층에서 외부 API 연동을 담당합니다.
+
+---
+
 ## ✅ 확인 문제
 
 ### 문제 1 (단일 선택)
@@ -321,4 +371,3 @@ React 애플리케이션에서 Ignite REST API를 호출할 때 발생할 수 �
 
 ### 다음 챕터 준비
 다음 챕터에서는 Ignite 클러스터의 **성능 최적화와 모니터링**에 대해 알아봅니다. 성능에 영향을 미치는 주요 요소를 튜닝하는 방법과, 클러스터의 상태를 확인하고 문제를 진단하는 도구들에 대해 학습합니다.
-

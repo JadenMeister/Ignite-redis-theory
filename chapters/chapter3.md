@@ -29,18 +29,18 @@ Java 애플리케이션에서 Ignite 클러스터와 통신하려면 **클라이
 ```mermaid
 graph TD
     subgraph "Ignite Cluster"
-        S1["Server Node 1\nData Partition A"]
-        S2["Server Node 2\nData Partition B"]
-        S3["Server Node 3\nData Partition C"]
+        S1["Server Node 1<br>Data Partition A"]
+        S2["Server Node 2<br>Data Partition B"]
+        S3["Server Node 3<br>Data Partition C"]
     end
 
     subgraph "Application"
-        C["Java Application\n(Client Node)"]
+        C["Java Application<br>(Client Node)"]
     end
 
-    C --> S1;
-    C --> S2;
-    C --> S3;
+    C --> S1
+    C --> S2
+    C --> S3
 
     style S1 fill:#3cb371
     style S2 fill:#3cb371
@@ -153,55 +153,13 @@ SQL 쿼리의 성능을 높이려면 반드시 **인덱스**를 생성해야 합
 
 ---
 
-## 🔧 실습 예제: 간단한 회원 관리 애플리케이션
+## 🔧 실습 예제: Ignite 클라이언트 및 CRUD/트랜잭션/SQL (Java/Spring, Kotlin/Spring)
 
-### 목표
-- `Member` 객체를 Ignite 캐시에 저장하고 관리합니다.
-- ID로 회원을 조회하고, 나이로 회원을 검색하는 기능을 구현합니다.
-
-#### 1. `Member` 클래스 정의
-회원 정보를 담을 `Member` 클래스를 만듭니다. SQL 쿼리를 위해 `@QuerySqlField`로 인덱스를 설정합니다.
-
-```java
-// 파일 경로: src/main/java/com/example/ignite/model/Member.java
-package com.example.ignite.model;
-
-import org.apache.ignite.cache.query.annotations.QuerySqlField;
-import java.io.Serializable;
-
-// Serializable 인터페이스는 객체가 다른 JVM이나 네트워크로 전송될 수 있도록 직렬화를 허용합니다.
-public class Member implements Serializable {
-
-    // age 필드에 인덱스를 생성합니다. 이렇게 하면 나이를 조건으로 하는 SQL 쿼리 성능이 향상됩니다.
-    @QuerySqlField(index = true)
-    private int age;
-
-    private String name;
-
-    // 생성자
-    public Member(int age, String name) {
-        this.age = age;
-        this.name = name;
-    }
-
-    // Getter 메서드들
-    public int getAge() { return age; }
-    public String getName() { return name; }
-
-    @Override
-    public String toString() {
-        return "Member [name=" + name + ", age=" + age + "]";
-    }
-}
-```
-
-#### 2. 메인 애플리케이션 작성
-
+### Java(Spring) 예제
 ```java
 // 파일 경로: src/main/java/com/example/ignite/Chapter3Example.java
 package com.example.ignite;
 
-import com.example.ignite.model.Member;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.Ignition;
@@ -209,57 +167,96 @@ import org.apache.ignite.cache.CacheMode;
 import org.apache.ignite.cache.query.SqlFieldsQuery;
 import org.apache.ignite.configuration.CacheConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
-
+import org.apache.ignite.transactions.Transaction;
 import java.util.List;
 
 public class Chapter3Example {
-
     public static void main(String[] args) {
-        // 1. Ignite 설정 및 클라이언트 노드 시작
+        // Ignite 클라이언트 노드 설정
         IgniteConfiguration cfg = new IgniteConfiguration();
-        cfg.setClientMode(true); // 클라이언트 모드로 설정
+        cfg.setClientMode(true); // 클라이언트 모드 활성화
 
         try (Ignite ignite = Ignition.start(cfg)) {
-            // 2. 캐시 설정 및 생성
-            CacheConfiguration<Long, Member> cacheCfg = new CacheConfiguration<>();
-            cacheCfg.setName("memberCache");
-            cacheCfg.setCacheMode(CacheMode.PARTITIONED); // 분산 캐시 모드 사용
-            cacheCfg.setIndexedTypes(Long.class, Member.class); // SQL 쿼리를 위해 타입과 인덱스 설정
+            // 캐시 설정 및 생성
+            CacheConfiguration<Long, String> cacheCfg = new CacheConfiguration<>();
+            cacheCfg.setName("userCache"); // 캐시 이름 지정
+            cacheCfg.setCacheMode(CacheMode.PARTITIONED); // 분산 캐시 모드
+            IgniteCache<Long, String> cache = ignite.getOrCreateCache(cacheCfg);
 
-            IgniteCache<Long, Member> memberCache = ignite.getOrCreateCache(cacheCfg);
+            // CRUD 예제
+            cache.put(1L, "Alice"); // Create/Update: 데이터 저장
+            String user = cache.get(1L); // Read: 데이터 조회
+            cache.put(1L, "Bob"); // Update: 데이터 수정
+            cache.remove(1L); // Delete: 데이터 삭제
 
-            // 3. CRUD 작업 예제
-            System.out.println("--- CRUD Operations ---");
-            // Create
-            memberCache.put(1L, new Member(30, "Alice"));
-            memberCache.put(2L, new Member(25, "Bob"));
-            // Read
-            Member member = memberCache.get(1L);
-            System.out.println("Read Member(1L): " + member);
-            // Update
-            memberCache.put(1L, new Member(31, "Alice"));
-            System.out.println("Updated Member(1L): " + memberCache.get(1L));
-            // Delete
-            memberCache.remove(2L);
-            System.out.println("Member(2L) exists after remove: " + memberCache.containsKey(2L));
+            // 트랜잭션 예제
+            try (Transaction tx = ignite.transactions().txStart()) {
+                cache.put(2L, "Charlie"); // 트랜잭션 내 데이터 저장
+                cache.put(3L, "Dave"); // 트랜잭션 내 데이터 저장
+                tx.commit(); // 모든 작업 성공 시 커밋
+            }
 
-            // 4. SQL 쿼리 예제
-            System.out.println("\n--- SQL Query ---");
-            // 30세 이상인 회원을 검색하는 SQL 쿼리
-            String sql = "select name, age from Member where age >= ?";
-            SqlFieldsQuery query = new SqlFieldsQuery(sql).setArgs(30); // '?' 파라미터에 30을 바인딩
-
-            // 쿼리 실행
-            List<List<?>> results = memberCache.query(query).getAll();
-
-            // 결과 출력
+            // SQL 쿼리 예제
+            String sql = "SELECT _key, _val FROM String WHERE _val LIKE 'C%'";
+            SqlFieldsQuery query = new SqlFieldsQuery(sql);
+            List<List<?>> results = cache.query(query).getAll();
             for (List<?> row : results) {
-                System.out.println("Found Member: name=" + row.get(0) + ", age=" + row.get(1));
+                System.out.println("Found: key=" + row.get(0) + ", value=" + row.get(1));
             }
         }
     }
 }
 ```
+
+### Kotlin(Spring) 예제
+```kotlin
+// 파일 경로: src/main/kotlin/com/example/ignite/Chapter3Example.kt
+package com.example.ignite
+
+import org.apache.ignite.Ignition
+import org.apache.ignite.cache.CacheMode
+import org.apache.ignite.cache.query.SqlFieldsQuery
+import org.apache.ignite.configuration.CacheConfiguration
+import org.apache.ignite.configuration.IgniteConfiguration
+
+fun main() {
+    // Ignite 클라이언트 노드 설정
+    val cfg = IgniteConfiguration().apply {
+        isClientMode = true // 클라이언트 모드 활성화
+    }
+    Ignition.start(cfg).use { ignite ->
+        // 캐시 설정 및 생성
+        val cacheCfg = CacheConfiguration<Long, String>().apply {
+            name = "userCache" // 캐시 이름 지정
+            cacheMode = CacheMode.PARTITIONED // 분산 캐시 모드
+        }
+        val cache = ignite.getOrCreateCache<Long, String>(cacheCfg)
+
+        // CRUD 예제
+        cache.put(1L, "Alice") // Create/Update: 데이터 저장
+        val user = cache.get(1L) // Read: 데이터 조회
+        cache.put(1L, "Bob") // Update: 데이터 수정
+        cache.remove(1L) // Delete: 데이터 삭제
+
+        // 트랜잭션 예제
+        ignite.transactions().txStart().use { tx ->
+            cache.put(2L, "Charlie") // 트랜잭션 내 데이터 저장
+            cache.put(3L, "Dave") // 트랜잭션 내 데이터 저장
+            tx.commit() // 모든 작업 성공 시 커밋
+        }
+
+        // SQL 쿼리 예제
+        val sql = "SELECT _key, _val FROM String WHERE _val LIKE 'C%'"
+        val query = SqlFieldsQuery(sql)
+        val results = cache.query(query).all
+        for (row in results) {
+            println("Found: key=${row[0]}, value=${row[1]}")
+        }
+    }
+}
+```
+
+> **파일 위치 설명**: 실습 예제 코드는 src/main/java 또는 src/main/kotlin 하위에 위치합니다. 이는 SpringBoot 프로젝트의 표준 구조로, 유지보수와 빌드 자동화에 유리합니다.
 
 ---
 
