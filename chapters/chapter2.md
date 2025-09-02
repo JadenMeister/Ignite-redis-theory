@@ -161,25 +161,25 @@ graph LR
 ### 시각적 자료
 ```mermaid
 graph TD
-    subgraph Cluster (1 Backup)
-        P1(Partition 1<br>Primary) --> B1(Partition 1<br>Backup);
-        P2(Partition 2<br>Primary) --> B2(Partition 2<br>Backup);
-        P3(Partition 3<br>Primary) --> B3(Partition 3<br>Backup);
+    subgraph "Cluster (1 Backup)"
+        subgraph "Node A"
+            P1("Partition 1\nPrimary")
+        end
+        subgraph "Node B"
+            P2("Partition 2\nPrimary")
+            B1("Partition 1\nBackup")
+        end
+        subgraph "Node C"
+            P3("Partition 3\nPrimary")
+            B2("Partition 2\nBackup")
+        end
+        subgraph "Node D"
+            B3("Partition 3\nBackup")
+        end
 
-        subgraph Node A
-            P1
-        end
-        subgraph Node B
-            P2
-            B1
-        end
-        subgraph Node C
-            P3
-            B2
-        end
-        subgraph Node D
-            B3
-        end
+        P1 --> B1;
+        P2 --> B2;
+        P3 --> B3;
     end
     style P1 fill:#3cb371
     style P2 fill:#3cb371
